@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interview Reps</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Interview Reps</h1>
+      <p class="sub">Capacity Planning &amp; Analytics, VP. Answer out loud before you look.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button id="tab-practice" role="tab" aria-selected="true">Practice</button>
+      <button id="tab-mock" role="tab" aria-selected="false">Mock interview</button>
+      <button id="tab-sheet" role="tab" aria-selected="false">Cheat sheet</button>
+      <button id="tab-progress" role="tab" aria-selected="false">Progress</button>
+    </div>
+  </header>
+  <div class="status" id="status"></div>
+
+  <main id="view-practice">
+    <div class="wrap" style="padding:0;gap:14px">
+      <div class="bar">
+        <div class="chips" id="filters"></div>
+        <div class="chips" id="modes">
+          <button id="mode-90" aria-pressed="true">90 sec</button>
+          <button id="mode-30" aria-pressed="false">30 sec exec</button>
+        </div>
+      </div>
+      <div class="card" id="card"></div>
+    </div>
+  </main>
+  <section id="view-mock" hidden><div class="card" id="mock"></div></section>
+  <section class="sheet" id="view-sheet" hidden></section>
+  <section class="sheet" id="view-progress" hidden></section>
+</div>
+<script src="deck.js"></script>
+<script src="audio.js"></script>
+<script src="delivery.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

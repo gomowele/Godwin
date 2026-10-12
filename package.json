@@ -1,0 +1,15 @@
+{
+  "name": "interview-reps",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Out-loud interview practice: 90-second reps with voice capture, delivery metrics and anchor-based rating.",
+  "type": "commonjs",
+  "scripts": {
+    "prestart": "node -e \"try{require.resolve('@anthropic-ai/sdk')}catch(e){console.log('First run: installing the Anthropic SDK...');require('child_process').execSync('npm install --no-audit --no-fund --loglevel=error',{stdio:'inherit'})}\"",
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0"
+  }
+}
