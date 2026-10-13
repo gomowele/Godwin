@@ -29,6 +29,24 @@ paste the whole thing into a chat for the rating.
 Other settings: `PORT` (default 3344), `INTERVIEW_REPS_MODEL` (default `claude-opus-5-5`), `INTERVIEW_REPS_DATA`
 (folder for history, default `./data`).
 
+## On your phone
+
+The app still runs on your computer. Your phone just opens it.
+
+```
+npm run phone
+```
+
+Scan the QR code it prints with your phone camera. That's it. It works on Wi-Fi or cellular, since the link goes
+through a free Cloudflare tunnel with HTTPS (phones only allow the mic on HTTPS). The link carries a private access
+key; anyone without it gets a locked page. Your history still saves on the computer.
+
+- Keep the computer awake and the terminal open while you practice.
+- The link changes each time you run it. Scan again.
+- First phone run downloads the tunnel helper, about 30 MB.
+- If it never connects, a work network, VPN or firewall is usually blocking it. Try home Wi-Fi.
+- iPhone: use Safari. Android: use Chrome. Headphones help the transcript.
+
 ## What is where
 
 - `public/deck.js`: your 44 questions, anchors, alternate phrasings and avoid lines, carried over unchanged.

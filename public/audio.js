@@ -6,6 +6,20 @@ const Capture = (() => {
   const PAUSE_MS = 2000;           // a "long pause" is 2 s or more of near-silence
   const POLL_MS = 50;
 
+  /* Join recognizer chunks, dropping overlaps: a chunk that repeats the text so far replaces it instead of doubling it. */
+  function joinPieces(pieces) {
+    let out = "";
+    for (const raw of pieces) {
+      const p = String(raw || "").trim(); if (!p) continue;
+      const lo = out.toLowerCase(), lp = p.toLowerCase();
+      if (!out) out = p;
+      else if (lp.startsWith(lo)) out = p;            // cumulative repeat (Android)
+      else if (lo.endsWith(lp)) continue;             // already have it
+      else out = out + " " + p;
+    }
+    return out;
+  }
+
   function pickMime() {
     if (!window.MediaRecorder) return "";
     for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]) {
@@ -44,6 +58,7 @@ const Capture = (() => {
     let speechStart = null, silentSince = null, spoke = false, threshold = 0.012, lastLevel = 0;
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});   // iOS starts it suspended after an await
       const src = ctx.createMediaStreamSource(stream);
       analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
       src.connect(analyser);
@@ -77,26 +92,32 @@ const Capture = (() => {
       try {
         rec = new SR();
         rec.continuous = true; rec.interimResults = true; rec.lang = opts.lang || "en-US"; rec.maxAlternatives = 1;
-        let sessionFinal = "";
+        const finals = [];   // sticky per result index: once a result is final we keep it, even if the browser drops it
         rec.onresult = ev => {
-          let fin = "", inter = "";
+          const inter = [];
           for (let i = 0; i < ev.results.length; i++) {
-            const r = ev.results[i]; const txt = (r[0] && r[0].transcript) || "";
-            if (r.isFinal) fin += txt + " "; else inter += txt + " ";
+            const r = ev.results[i]; const txt = ((r[0] && r[0].transcript) || "").trim();
+            if (!txt) continue;
+            if (r.isFinal) finals[i] = txt; else inter.push(txt);
           }
+          const sessionFinal = joinPieces(finals.filter(Boolean));
+          let interim = joinPieces(inter);
+          // Android Chrome repeats the whole utterance so far; strip what is already final
+          const lf = sessionFinal.toLowerCase(), li = interim.toLowerCase();
+          if (lf && li.startsWith(lf)) interim = interim.slice(sessionFinal.length).trim();
+          else if (lf && lf.endsWith(li)) interim = "";
           const t = now();
-          // new final segments
-          if (fin.length > sessionFinal.length) {
-            const added = fin.slice(sessionFinal.length).trim();
+          const prevFinal = tr.final;
+          tr.final = joinPieces([tr._base || "", sessionFinal]);
+          tr.interim = interim;
+          if (tr.final.length > prevFinal.length) {
+            const added = tr.final.startsWith(prevFinal) ? tr.final.slice(prevFinal.length).trim() : sessionFinal;
             if (added) tr.segments.push({ text: added, t: +t.toFixed(2) });
-            sessionFinal = fin;
           }
-          tr.final = (tr._base || "") + fin;
-          tr.interim = inter.trim();
           // per-word arrival times, approximate: a word gets the time its chunk first appeared
           const allWords = (tr.final + " " + tr.interim).trim().split(/\s+/).filter(Boolean);
           while (tr.words.length < allWords.length) tr.words.push({ w: allWords[tr.words.length], t: +t.toFixed(2) });
-          if (tr.words.length > allWords.length) tr.words.length = allWords.length;   // recognizer revised a chunk shorter
+          if (tr.words.length > allWords.length) tr.words.length = allWords.length;
           tr.words.forEach((x, i) => { x.w = allWords[i]; });
           emit();
         };
@@ -111,7 +132,8 @@ const Capture = (() => {
           emit();
         };
         rec.onend = () => {
-          tr._base = tr.final; tr.interim = "";
+          if (tr.interim) { tr.final = joinPieces([tr.final, tr.interim]); tr.interim = ""; }
+          tr._base = tr.final;
           if (active && restarts++ < 60) setTimeout(startSR, 120);   // Chrome ends after a silence; keep going
           else if (opts.onSpeechEnd) opts.onSpeechEnd();
         };
@@ -129,7 +151,7 @@ const Capture = (() => {
       const srDone = new Promise(res => {
         if (!rec) return res();
         const timer = setTimeout(res, 700);
-        rec.onend = () => { clearTimeout(timer); tr.interim = ""; res(); };
+        rec.onend = () => { clearTimeout(timer); res(); };
         try { rec.stop(); } catch (e) { clearTimeout(timer); res(); }
       });
       const recDone = new Promise(res => {
@@ -141,7 +163,7 @@ const Capture = (() => {
       await Promise.all([srDone, recDone]);
       stream.getTracks().forEach(t => t.stop());
       if (ctx) try { await ctx.close(); } catch (e) {}
-      if (tr.interim) { tr.final = (tr.final + " " + tr.interim).trim(); tr.interim = ""; }
+      if (tr.interim) { tr.final = joinPieces([tr.final, tr.interim]); tr.interim = ""; }
       const type = (recorder && recorder.mimeType) || mime || "audio/webm";
       const blob = chunks.length ? new Blob(chunks, { type }) : null;
       stopped = Promise.resolve({ blob, mime: type, seconds: endT, pauses: pauses.slice(), speechStart, levels, transcript: tr });

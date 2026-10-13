@@ -3,6 +3,7 @@
    Env: ANTHROPIC_API_KEY (optional; enables rating), PORT, INTERVIEW_REPS_MODEL, INTERVIEW_REPS_DATA */
 "use strict";
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
@@ -168,9 +169,35 @@ function readBody(req, limit) {
 }
 const safeId = id => /^[A-Za-z0-9_-]{1,80}$/.test(id) ? id : null;
 
+/* Phone mode: requests that arrive through the Cloudflare tunnel carry cf-connecting-ip and must hold the access key.
+   Requests made directly on this computer (no tunnel header) are let through. */
+const PHONE_KEY = process.env.PHONE_KEY || "";
+function keyOk(k) {
+  if (!k || !PHONE_KEY) return false;
+  const a = Buffer.from(String(k)), b = Buffer.from(PHONE_KEY);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function cookieKey(req) {
+  const m = /(?:^|;\s*)ir_key=([^;]+)/.exec(req.headers.cookie || "");
+  return m ? decodeURIComponent(m[1]) : "";
+}
+function guard(req, res, url) {
+  if (!PHONE_KEY || !req.headers["cf-connecting-ip"]) return true;
+  const q = url.searchParams.get("key");
+  if (q && keyOk(q)) {
+    url.searchParams.delete("key");
+    res.writeHead(302, { "Set-Cookie": "ir_key=" + encodeURIComponent(PHONE_KEY) + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000", Location: url.pathname + (url.search || ""), "Cache-Control": "no-store" });
+    res.end(); return false;
+  }
+  if (keyOk(cookieKey(req))) return true;
+  send(res, 401, "<!doctype html><meta name=viewport content='width=device-width'><body style='font:16px system-ui;padding:24px'><h2>Locked</h2><p>Scan the QR code from your computer's terminal again. It carries the access key.</p>", "text/html; charset=utf-8");
+  return false;
+}
+
 async function handle(req, res) {
   const url = new URL(req.url, "http://localhost");
   const p = url.pathname;
+  if (!guard(req, res, url)) return;
   if (p === "/api/config") return send(res, 200, { rating: HAS_KEY, model: MODEL, dataDir: DATA });
   if (p === "/api/state") {
     if (req.method === "GET") return send(res, 200, readState() || {});
@@ -253,3 +280,4 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("History file     ->  " + STATE_FILE);
   console.log("Rating           ->  " + (HAS_KEY ? "on (" + MODEL + ")" : "off. Set ANTHROPIC_API_KEY to turn it on; the copy-to-chat button works without it.") + "\n");
 });
+module.exports = { server, PORT };

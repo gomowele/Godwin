@@ -6,9 +6,13 @@
   "type": "commonjs",
   "scripts": {
     "prestart": "node -e \"try{require.resolve('@anthropic-ai/sdk')}catch(e){console.log('First run: installing the Anthropic SDK...');require('child_process').execSync('npm install --no-audit --no-fund --loglevel=error',{stdio:'inherit'})}\"",
-    "start": "node server.js"
+    "start": "node server.js",
+    "prephone": "node -e \"try{require.resolve('@anthropic-ai/sdk')}catch(e){console.log('First run: installing the Anthropic SDK...');require('child_process').execSync('npm install --no-audit --no-fund --loglevel=error',{stdio:'inherit'})}\"",
+    "phone": "node phone.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0"
   }
